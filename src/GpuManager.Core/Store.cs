@@ -12,7 +12,7 @@ public sealed class Store
     private readonly string mutexName;
     public Store(string root)
     {
-        Root = Path.GetFullPath(root);
+        Root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         mutexName = @"Local\GpuManagerData-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Root.ToUpperInvariant())))[..20];
     }
     public T Read<T>(string name, T fallback, bool root = false)

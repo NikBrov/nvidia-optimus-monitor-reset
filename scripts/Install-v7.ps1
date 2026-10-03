@@ -17,6 +17,12 @@ if (-not $admin) {
 }
 $backup = $null
 $changed = $false
+function Copy-InstalledFile([string]$Source, [string]$Target) {
+    for ($attempt=0; $attempt -lt 20; $attempt++) {
+        try { Copy-Item -LiteralPath $Source -Destination $Target -Force; return }
+        catch { if ($attempt -eq 19) { throw }; Start-Sleep -Milliseconds 500 }
+    }
+}
 try {
     if ($ExpectedSid -and $ExpectedSid -ne $identity.User.Value) { throw 'Run the installer from the intended Windows account; elevation must keep the same account.' }
     if ([IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\') -eq $dest) { throw 'Extract the package outside the live installation before updating.' }
@@ -57,12 +63,15 @@ try {
     # Close only our previous panel, leaving other PowerShell windows untouched.
     $legacy = @(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.ProcessId -ne $PID -and $_.SessionId -eq (Get-Process -Id $PID).SessionId -and $_.CommandLine -match [regex]::Escape('C:\NvidiaReset\GpuControl.ps1') })
     foreach ($process in $legacy) { Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue }
-    foreach ($process in @(Get-Process -Name GpuManager -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $dest 'GpuManager.exe') })) { Stop-Process -Id $process.Id -Force }
+    foreach ($process in @(Get-Process -Name GpuManager,GpuManager.Agent -ErrorAction SilentlyContinue | Where-Object { $_.Path -in @((Join-Path $dest 'GpuManager.exe'),(Join-Path $dest 'GpuManager.Agent.exe')) })) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+        if (-not $process.WaitForExit(10000)) { throw 'Previous executable did not exit.' }
+    }
     if (Test-Path (Join-Path $dest 'data')) { Copy-Item -LiteralPath (Join-Path $dest 'data') -Destination (Join-Path $backup 'data') -Recurse }
     'Ready' | Set-Content (Join-Path $backup 'snapshot-complete.flag') -Encoding ASCII
     $runtimeFiles = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.dll' -File | Select-Object -ExpandProperty Name)
     foreach ($file in (@('GpuManager.exe','GpuManager.Agent.exe','README.txt','rollback-v7.ps1','LICENSE') + $runtimeFiles)) {
-        if (Test-Path (Join-Path $PSScriptRoot $file)) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $dest -Force }
+        if (Test-Path (Join-Path $PSScriptRoot $file)) { Copy-InstalledFile (Join-Path $PSScriptRoot $file) (Join-Path $dest $file) }
     }
     $configPath = Join-Path $dest 'config.json'
     $config = if (Test-Path $configPath) { Get-Content $configPath -Raw | ConvertFrom-Json } else { Get-Content (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json }

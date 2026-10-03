@@ -8,7 +8,10 @@ $Backup = [IO.Path]::GetFullPath($Backup)
 if ([IO.Path]::GetDirectoryName($Backup) -ne $dest -or [IO.Path]::GetFileName($Backup) -notlike 'backup-v7-*' -or -not (Test-Path (Join-Path $Backup 'registry-before.json'))) { throw 'Invalid rollback snapshot.' }
 $tasks = @(@{Name='Auto Reset NVIDIA on Monitor Disconnect';File='agent-task.xml'},@{Name='GPU Manager Panel';File='panel-task.xml'})
 foreach ($task in $tasks) { if (Get-ScheduledTask -TaskName $task.Name -ErrorAction SilentlyContinue) { Stop-ScheduledTask -TaskName $task.Name; Start-Sleep -Seconds 1 } }
-foreach ($process in @(Get-Process -Name GpuManager,GpuManager.Agent -ErrorAction SilentlyContinue | Where-Object { $_.Path -in @((Join-Path $dest 'GpuManager.exe'),(Join-Path $dest 'GpuManager.Agent.exe')) })) { Stop-Process -Id $process.Id -Force }
+foreach ($process in @(Get-Process -Name GpuManager,GpuManager.Agent -ErrorAction SilentlyContinue | Where-Object { $_.Path -in @((Join-Path $dest 'GpuManager.exe'),(Join-Path $dest 'GpuManager.Agent.exe')) })) {
+    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    if (-not $process.WaitForExit(10000)) { throw 'Current executable did not exit.' }
+}
 $registry = 'HKCU:\Software\Microsoft\DirectX\UserGpuPreferences'
 $snapshot = @(Get-Content (Join-Path $Backup 'registry-before.json') -Raw | ConvertFrom-Json)
 $touched = Join-Path $dest 'data\preferences-before.json'

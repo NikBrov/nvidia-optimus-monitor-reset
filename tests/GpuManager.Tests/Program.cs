@@ -7,6 +7,7 @@ var directory = Path.Combine(Path.GetTempPath(), "GpuManagerTests-" + Guid.NewGu
 Directory.CreateDirectory(directory);
 try
 {
+    Assert(new Store(directory + Path.DirectorySeparatorChar).Root == new Store(directory).Root, "Shortcut and scheduled-task roots share one panel and data lock");
     var internalDisplay = new[] { new GpuNative.DisplayPath { Key = "internal", Internal = true } };
     var externalDisplay = new[] { new GpuNative.DisplayPath { Key = "external", Nvidia = true, Internal = false } };
     var power = new GpuNative.DeviceState { Id = "fixture", Present = true, Problem = 0, Power = "D0" };

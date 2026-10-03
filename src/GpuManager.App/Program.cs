@@ -24,7 +24,7 @@ internal static class Program
             using var identity = WindowsIdentity.GetCurrent();
             if (new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))
             { MessageBox.Show("Откройте панель обычным двойным щелчком, без запуска от администратора.", "GPU Manager"); return 1; }
-            var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(root).ToUpperInvariant())))[..20];
+            var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(store.Root.ToUpperInvariant())))[..20];
             using var mutex = new Mutex(true, @"Local\GpuManagerV7Panel-" + key, out var fresh);
             if (!fresh) { Directory.CreateDirectory(store.Data); File.WriteAllText(Path.Combine(store.Data, "ui-activate.flag"), "open"); return 0; }
             try
