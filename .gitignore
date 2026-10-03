@@ -9,3 +9,6 @@
 *.previous
 *.zip
 *.png
+**/bin/
+**/obj/
+/artifacts/

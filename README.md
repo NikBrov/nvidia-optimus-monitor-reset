@@ -1,94 +1,98 @@
-# NVIDIA Optimus Monitor Reset — GPU Manager v6
+# NVIDIA Optimus Monitor Reset — GPU Manager v7
 
-Windows utility for muxless NVIDIA Optimus laptops where applications keep the discrete GPU active after an external monitor is disconnected. Tested on an Acer Predator Triton 300 SE PT314-51s with Intel Iris Xe and NVIDIA RTX 3060.
+Native C# / .NET 10 / WinForms utility for Windows Optimus laptops where applications keep NVIDIA active after an external monitor is disconnected. Validated on Acer Predator Triton 300 SE PT314-51s, Intel Iris Xe + RTX 3060.
 
-GPU Manager assigns everyday applications to Intel, keeps NVIDIA available for demanding applications, and considers a guarded device restart after display/power events. It does not migrate already-running applications between GPUs or guarantee a particular battery-life improvement.
+GPU Manager assigns everyday apps to Intel, keeps NVIDIA available for demanding apps, and considers a guarded device restart after display/power events. It cannot move existing graphics contexts between GPUs. HDMI wired to NVIDIA still requires it while a monitor is connected.
 
 ## Возможности
 
-- Режимы **Авто**, **Экономия энергии**, пауза автосброса на 30 минут, 2 часа или до ручного отключения.
-- Управление приложениями: Intel / NVIDIA / выбор Windows, удаление из управления и восстановление исходного назначения.
-- Диагностика энергосостояния, подключённых экранов и клиентов NVIDIA по данным Windows.
-- Политика сброса: автоматически после проверок, спрашивать или только уведомлять. Ручной запрос всегда требует подтверждения.
-- Встроенная защита рабочих приложений и добавление собственных защищённых EXE.
-- История событий, экспорт JSON-отчёта и отдельный учёт активного времени и времени сна.
-- Замеры расхода батареи на 5–10 минут, CPU-нагрузка, состояние GPU и сохранение JSON/CSV.
+- Авто, Экономия энергии, пауза на 30 минут, 2 часа или до ручного отключения.
+- Назначения Intel / NVIDIA / выбор Windows, добавление EXE, удаление из управления, восстановление исходного назначения.
+- Диагностика экранов, энергосостояния и клиентов NVIDIA через Windows API.
+- Автоматический сброс после проверок, запрос подтверждения или только уведомление. Ручной запрос всегда требует подтверждения.
+- Защита рабочих приложений и собственные защищённые EXE, история, экспорт JSON.
+- Замеры батареи 5–10 минут с CPU-нагрузкой, состоянием GPU и JSON/CSV.
+- Панель и трей с обычными правами, отдельный наблюдатель с правом перезапуска устройства.
 
-Подробное описание всех кнопок: [README.txt](README.txt).
+Каждая кнопка описана в [README.txt](README.txt).
 
-## Install / установка
+## Установка
 
-Requirements: Windows 11, Windows PowerShell 5.1, an interactive user account with administrator elevation available, Intel + one NVIDIA display adapter. NVIDIA adapter mapping must be available through `QueryDisplayConfig`. Other laptop models and multi-NVIDIA systems have not been validated.
+Windows 11 x64, Intel + один NVIDIA display adapter, интерактивная учётная запись с повышением прав через UAC. Другие модели и установка на чистый второй ноутбук пока не проверены. При нескольких NVIDIA задайте точный DeviceId в config.json.
+
+Скачайте **GpuManager-v7-win-x64.zip** из [Releases](https://github.com/NikBrov/nvidia-optimus-monitor-reset/releases), распакуйте и откройте **Install.cmd**. Подтвердите UAC. Среда .NET включена в пакет; отдельная установка .NET не требуется. PowerShell используется для установки и отката, рабочие EXE его не запускают.
+
+Создаются:
+
+- C:\NvidiaReset\GpuManager.exe — панель и трей;
+- C:\NvidiaReset\GpuManager.Agent.exe — наблюдатель;
+- C:\NvidiaReset\data — настройки, назначения, журнал, история, измерения;
+- задача **Auto Reset NVIDIA on Monitor Disconnect** — EXE-наблюдатель с повышенными правами;
+- задача **GPU Manager Panel** — панель с обычными правами, запуск в трее;
+- ярлыки **GPU - Intel и NVIDIA** и **GPU - Инструкция** на рабочем столе.
+
+Обе задачи запускаются при входе, работают на батарее без ограничения длительности. Открывайте панель обычным способом. Крестик и сворачивание прячут её в трей; пункт «Выйти из панели и трея» закрывает панель, наблюдатель продолжает работать. Без панели подтверждения истекают без сброса.
+
+Обновление v6 сохраняет конфигурацию, назначения, защиту, режим, историю и замеры. Установщик сохраняет защищённую копию файлов, данных, задач, назначений Windows и ярлыков, затем проверяет свежий статус нового наблюдателя. При ошибке после остановки старой версии пытается её восстановить; результат — install-v7-result.json рядом с пакетом. При обычном запуске наблюдателя GPU не сбрасывается.
+
+После изменения GPU перезапустите приложение. Примерные пути в config.json нужно сверить с установленными версиями. APPDATA / LOCALAPPDATA разворачиваются для текущего пользователя. Store-приложения обнаруживаются при запуске и ежедневно; пользовательское назначение привязано к точному EXE, поэтому после обновления проверьте новый путь.
+
+## Защита и ограничения
+
+После события — задержка 15 секунд. Для сброса нужны активный внутренний экран, отсутствие внешних экранов, здоровая NVIDIA в D0, отсутствие защищённых программ и неизвестных клиентов, известный источник питания и минимум 5 минут после предыдущего сброса. Проверки повторяются перед pnputil /restart-device конкретного устройства. Во время замера батареи сбросы приостановлены.
+
+Подтверждение действует 90 секунд и связано с путями, PID и временем запуска клиентов. Изменение клиентов или повторное использование PID отменяет разрешение. Сон/пробуждение отменяют старые запросы. После сброса — пассивные проверки примерно через 20 и 60 секунд; отсутствие экономии не вызывает повторный сброс того же события.
+
+Перезапуск может прервать графические ресурсы, видео и звонки; защиты не гарантируют восстановление всех приложений. Между последней проверкой и стартом процесса остаётся небольшое окно. Менеджер не закрывает пользовательские приложения.
+
+Постоянного опроса nvidia-smi / NVML нет. D0/D3 — последнее состояние по данным Windows, не замер ватт и не доказательство D3cold. GPU-память указывает возможных клиентов, а не текущую загрузку или точную причину расхода.
+
+Батарейные замеры показывают расход всего ноутбука. Сравнивайте завершённые результаты при одинаковых яркости, приложениях и нагрузке. Сон, подключение зарядки и перерывы делают замер непригодным для сравнения. Отсутствующие данные не заменяются нулями. Улучшение автономности не гарантируется; сравнительные физические замеры после переноса ещё не выполнены.
+
+## Откат
+
+В PowerShell от администратора:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\NvidiaReset\rollback-v7.ps1"
+```
+
+Восстанавливает предыдущие файлы, назначения, настройки, задачи и ярлыки. При первой установке убирает созданные задачи и ярлыки, возвращает назначения перед установкой. Файлы и новая история остаются. Резервная копия: C:\NvidiaReset\backup-v7-*; путь хранится в защищённом upgrade-v7.json.
+
+## Сборка и проверка
+
+Windows и .NET 10 SDK:
 
 ```powershell
 git clone https://github.com/NikBrov/nvidia-optimus-monitor-reset.git
 cd nvidia-optimus-monitor-reset
-.\Update-v6.cmd
+dotnet build GpuManager.sln -c Release
+dotnet run --project tests/GpuManager.Tests/GpuManager.Tests.csproj -c Release
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\Build.ps1
+.\Install.cmd
 ```
 
-Or download the repository ZIP, extract it and open **Update-v6.cmd**. Confirm the Windows UAC prompt. This entry point supports a fresh installation and upgrading an existing `C:\NvidiaReset` installation. The fresh-install path has been inspected and parsed but has not been exercised on a clean second laptop; the running v6 application was validated on the Acer above.
+Пакет — artifacts\GpuManager-v7-win-x64.zip. CI на Windows собирает, проверяет и сохраняет ZIP. Пакет содержит среду исполнения, что увеличивает его размер. Не удаляйте DLL рядом с EXE: они нужны для работы.
 
-Installation creates:
+37 автоматических проверок охватывают защитные условия, повторную проверку, истечение подтверждений, PID reuse, миграцию JSON v6, восстановление назначений, ошибки счётчиков, паузу, сон и полный цикл замера на управляемых часах. Тесты используют временное значение HKCU и удаляют его; реальный GPU не перезапускают.
 
-- `C:\NvidiaReset` — protected application code;
-- `C:\NvidiaReset\data` — writable state, preferences, logs and battery sessions;
-- scheduled task **Auto Reset NVIDIA on Monitor Disconnect**, at user logon, allowed on battery, without a runtime limit;
-- desktop shortcuts **GPU - Intel и NVIDIA** and **GPU - Инструкция**.
-
-Open the panel normally, without “Run as administrator”. The background scheduled task has the rights needed for device restart; programs launched from the panel run with the user's ordinary token.
-
-The installer automatically detects a single NVIDIA display device when `DeviceId` in `config.json` is empty. With multiple NVIDIA devices, specify the exact adapter ID yourself. Example executable paths in the configuration reflect the tested application versions; adjust them for your installed software. `%APPDATA%` and `%LOCALAPPDATA%` are expanded for the current user. Existing installations keep their configuration and data.
-
-Restart applications after changing their GPU preference. User choices in the panel override the default managed list. Removing an app from management preserves its current Windows setting; restoring its original assignment also stops managing it.
-
-## Restart policy and limitations
-
-After a relevant event, the manager waits 15 seconds. A restart requires an active internal display, no external displays, a healthy NVIDIA device in D0, no protected applications, no unknown GPU clients, and a five-minute cooldown. Safety checks are repeated immediately before `pnputil /restart-device` for the exact adapter.
-
-An approval expires after 90 seconds and is invalidated by a changed client list. Old requests are cancelled after resume. A successful restart is followed by passive checks at approximately 20 and 60 seconds; an unchanged power state does not cause another restart for that event. Automatic resets are suspended during battery measurements.
-
-Restarting the device can interrupt graphics resources, video playback or calls; conservative checks do not guarantee application recovery. There remains a small race between the last check and a newly started application. The manager does not close user applications.
-
-No continuous `nvidia-smi` / NVML polling is used. D0/D3 is the last device power state reported by Windows, not a watt measurement or proof of D3cold. GPU memory allocations identify possible clients, not instantaneous utilization or definite causality. An HDMI port physically wired to NVIDIA still needs NVIDIA for display output.
-
-Battery measurements report **whole-laptop** consumption, not NVIDIA alone. Compare completed runs with the same brightness, apps and workload. Sleep, AC connection and interruptions invalidate a run. Missing discharge data is displayed as unavailable, not zero watts. A short run cannot prove the cause of a change in consumption.
-
-## Configuration and privacy
-
-`config.json` contains default app paths, protected process names, restart delay and cooldown. `data/app-overrides.json` contains user choices; `data/options.json` contains the reset policy and user-protected paths. Packaged Store app paths are refreshed at startup and daily; a user override applies to an exact EXE path and should be reviewed after an update changes that path.
-
-Local logs, reports, device-specific state, preference backups and measurements are excluded from Git. Reports contain application paths and event history; inspect an exported report before sharing it.
-
-## Rollback
-
-From an administrator PowerShell window:
+Проверка на реальном ноутбуке без изменения устройства, с отдельной доступной для записи папкой и config.json:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\NvidiaReset\rollback-v6.ps1"
+.\artifacts\package\GpuManager.Agent.exe --root C:\GpuManagerTest --audit
+.\artifacts\package\GpuManager.Agent.exe --root C:\GpuManagerTest --observe-only --exit-after 60
 ```
 
-An upgrade restores the previous application files, saved preferences and scheduled task, and starts that task. Its previous behavior applies, including startup resets if an older version had them. A fresh-install rollback removes the task and matching desktop shortcuts and restores preferences. Files, logs and measurements are retained. The installer creates its backup under `C:\NvidiaReset\backup-v5-*` before replacing files.
+Audit сохраняет диагностику и завершается. Observe-only обрабатывает команды/события и пишет DRY_RUN вместо сброса; назначения Windows не меняет. Не запускайте обычный тестовый наблюдатель параллельно рабочему. Физические отключения HDMI после переноса ещё не проверены.
 
-## Development and validation
+## Код и данные
 
-Scripts containing Russian text use **UTF-8 with BOM** for Windows PowerShell 5.1. Keep that encoding when editing. `GpuNative.cs` is compiled by `Add-Type` at runtime; no prebuilt binaries are required.
+src/GpuManager.Core — Windows API, политика, назначения, состояние и батарея. src/GpuManager.Agent — последовательный фоновый обработчик и окно событий Windows. src/GpuManager.App — WinForms, команды, трей. Длительные операции выполняются вне потока интерфейса. JSON записывается атомарно, изменения назначений сериализуются между процессами. Команды имеют фиксированный набор действий и не содержат произвольного запуска кода.
 
-On a compatible Windows laptop, from the repository directory:
+Старые PowerShell-файлы и тесты v6 оставлены для истории и восстановления. Установка v7 использует scripts/Install-v7.ps1, рабочие задачи — EXE. Update-v6.cmd устанавливает старую версию.
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\test-v6.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\test-approval.ps1
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\smoke-v6.ps1
-```
+Логи, персональные пути, DeviceId, резервные копии и измерения исключены из Git. Отчёт содержит пути приложений и историю; просмотрите перед публикацией. Программа не отправляет телеметрию.
 
-The policy suite checks reset gates, preferences, original-value restoration and battery calculations. It uses a temporary registry value for a fixture EXE and removes it afterwards. The approval test uses isolated mock clients and forbids real restart calls. The smoke test runs `ObserveOnly` with a separate mutex and never restarts the GPU. They create temporary state under the checkout; run against a separate checkout, not the protected installed folder.
+[QueryDisplayConfig](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig), [SYSTEM_BATTERY_STATE](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-system_battery_state), [QueryUnbiasedInterruptTime](https://learn.microsoft.com/en-us/windows/win32/api/realtimeapiset/nf-realtimeapiset-queryunbiasedinterrupttime).
 
-Validated on the Acer: policy tests, confirmation flow including changed clients, observer command processing, panel layout, installed task and a manual check that correctly skipped restarting a D3 GPU. Controlled physical unplug tests, a fresh installation on a clean laptop and comparative 5–10 minute battery runs remain unverified.
-
-## Windows APIs
-
-- [QueryDisplayConfig](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig) — display topology.
-- [SYSTEM_BATTERY_STATE](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-system_battery_state) — battery discharge readings.
-- [QueryUnbiasedInterruptTime](https://learn.microsoft.com/en-us/windows/win32/api/realtimeapiset/nf-realtimeapiset-queryunbiasedinterrupttime) — active time excluding sleep and hibernation.
-
-MIT license. See [LICENSE](LICENSE).
+MIT: [LICENSE](LICENSE).
