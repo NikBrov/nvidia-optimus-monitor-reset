@@ -1,0 +1,11 @@
+/data/
+/backup-*/
+/*result.json
+/*error.txt
+/test-*/
+/approval-test-*/
+*.tmp
+*.log
+*.previous
+*.zip
+*.png

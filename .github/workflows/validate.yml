@@ -1,0 +1,28 @@
+name: Validate Windows sources
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  parse-and-compile:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell and compile native interop
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $errors = @()
+          Get-ChildItem -Recurse -Filter '*.ps1' | ForEach-Object {
+            $tokens = $null
+            $parse = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$parse)
+            $errors += @($parse)
+          }
+          if ($errors.Count) { $errors | Format-List; throw 'PowerShell syntax errors' }
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -Path .\GpuNative.cs -ReferencedAssemblies System.Windows.Forms
+          if ([GpuNative]::AwakeSeconds() -lt 0) { throw 'Invalid awake clock' }
+          Get-Content .\config.json -Raw | ConvertFrom-Json | Out-Null
+          'Parsing and native interop compilation passed. No GPU restart or installation performed.'
